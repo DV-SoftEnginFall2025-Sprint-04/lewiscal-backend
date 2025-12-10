@@ -9,28 +9,6 @@ globalThis.fetch = fetch;
 const { parseICS, createEventObject } = require('../utils/parseICS');
 const router = express.Router();
 
-//scholarship events
-const scholarshipEvents = [
-    createEventObject({
-        id: "sch-001",
-        title: "Celebration of Scholarship Opening Ceremony",
-        start: "2025-04-15T13:00:00.000Z",
-        end: "2025-04-15T14:00:00.000Z",
-        location: "Lewis University",
-        description: "Opening event for the Celebration of Scholarship.",
-        source: "scholarship"
-    }),
-    createEventObject({
-        id: "sch-002",
-        title: "Capstone Team Poster Session",
-        start: "2025-04-15T15:00:00.000Z",
-        end: "2025-04-15T17:00:00.000Z",
-        location: "St. Charles Borromeo",
-        description: "Students present their capstone projects.",
-        source: "scholarship"
-    })
-];
-
 // refresh
 router.get('/', async (req, res) => {
     try {
@@ -86,15 +64,12 @@ router.get('/', async (req, res) => {
         // parce ic content
         const parsedEvents = parseICS(icsContent);
 
-        // merge events
-        const allEvents = [...parsedEvents, ...scholarshipEvents];
+        const allEvents = parsedEvents;
 
         return res.json({
             updated: true,
-            totalEvents: allEvents.length,
-            importedEvents: parsedEvents.length,
-            scholarshipEvents: scholarshipEvents.length,
-            events: allEvents
+            totalEvents: parsedEvents.length,
+            events: parsedEvents
         });
 
     } catch (error) {
