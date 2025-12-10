@@ -22,6 +22,7 @@ router.get('/', async (req, res) => {
 
                 const response = await fetch(calendarURL, {
                     method: "GET",
+                    redirect: "follow",
                     headers: {
                         "User-Agent": "Mozilla/5.0",     
                         "Accept": "text/calendar,*/*"    
