@@ -1,84 +1,81 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const fetch = require('node-fetch');
+const { parseICS } = require('../utils/parseICS');
 
-// node fetch v2 setup
-const fetch = require("node-fetch");
-globalThis.fetch = fetch;
-
-const { parseICS, createEventObject } = require('../utils/parseICS');
 const router = express.Router();
 
-// refresh
 router.get('/', async (req, res) => {
     try {
         const calendarURL = req.query.url;
-        let icsContent = "";
 
-        // ics link provided
-        if (calendarURL && calendarURL.startsWith("http")) {
-            try {
-                console.log("Fetching ICS from:", calendarURL);
+        if (!calendarURL) {
+            return res.status(400).json({
+                error: "No calendar URL provided."
+            });
+        }
 
-                const response = await fetch(calendarURL, {
-                    method: "GET",
-                    redirect: "follow",
-                    headers: {
-                        "User-Agent": "Mozilla/5.0",     
-                        "Accept": "text/calendar,*/*"    
-                    }
-                });
-
-                if (!response.ok) {
-                    return res.status(400).json({
-                        error: "Failed to fetch the provided ICS URL.",
-                        status: response.status,
-                        statusText: response.statusText
-                    });
+        // fetch the ics file while supporting redirects
+        let response;
+        try {
+            response = await fetch(calendarURL, {
+                method: "GET",
+                redirect: "follow",   
+                headers: {
+                    "User-Agent": "Mozilla/5.0",  
+                    "Accept": "text/calendar, text/plain, */*" 
                 }
-
-                icsContent = await response.text();
-            } catch (err) {
-                console.error("ICS Fetch Error:", err);
-
-                return res.status(500).json({
-                    error: "Unable to fetch calendar URL.",
-                    details: err.message
-                });
-            }
+            });
+        } catch (err) {
+            return res.status(500).json({
+                error: "Network error while attempting to fetch the ICS URL.",
+                details: err.message,
+                attemptedURL: calendarURL
+            });
         }
 
-        //fallback to local file
-        else {
-            const calendarPath = path.join(__dirname, '..', 'calendar.ics');
-
-            if (!fs.existsSync(calendarPath)) {
-                return res.status(404).json({
-                    error: "Local calendar.ics file not found.",
-                    path: calendarPath
-                });
-            }
-
-            icsContent = fs.readFileSync(calendarPath, "utf-8");
+        if (!response.ok) {
+            return res.status(400).json({
+                error: "Failed to fetch the provided ICS URL.",
+                status: response.status,
+                statusText: response.statusText,
+                attemptedURL: calendarURL
+            });
         }
 
-        // parce ic content
-        const parsedEvents = parseICS(icsContent);
+        // raw ics text
+        let icsText = await response.text();
 
-        const allEvents = parsedEvents;
+        // catch for invalid ics files
+        if (!icsText.includes("BEGIN:VEVENT")) {
+            return res.status(400).json({
+                error: "The downloaded file is not a valid ICS calendar.",
+                sample: icsText.substring(0, 200)
+            });
+        }
 
+        //parse icss
+        let events = [];
+        try {
+            events = parseICS(icsText);
+        } catch (err) {
+            return res.status(500).json({
+                error: "Failed to parse ICS calendar.",
+                details: err.message
+            });
+        }
+
+        //success
         return res.json({
             updated: true,
-            totalEvents: parsedEvents.length,
-            events: parsedEvents
+            eventCount: events.length,
+            events
         });
 
-    } catch (error) {
-        console.error("Refresh Route Error:", error);
-
+    } catch (err) {
+        console.error("Unexpected refresh error:", err);
         return res.status(500).json({
-            error: "Unable to refresh calendar.",
-            details: error.message
+            error: "Unexpected server error.",
+            details: err.message
         });
     }
 });
