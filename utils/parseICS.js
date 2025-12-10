@@ -73,40 +73,57 @@ function parseICS(icsText) {
 //parser for various ICS time formats
 function parseICSTime(dt) {
     try {
+        if (!dt) return null;
+
+        // handle DATE format
+        if (dt.includes("VALUE=DATE")) {
+            const datePart = dt.split(":")[1];
+            const year = datePart.substring(0, 4);
+            const month = datePart.substring(4, 6);
+            const day = datePart.substring(6, 8);
+            return new Date(`${year}-${month}-${day}T00:00:00`).toISOString();
+        }
+
+        // handle TZID format
         if (dt.includes("TZID=")) {
             dt = dt.split(":")[1];
         }
 
-        // ends with z is utc
+        // handle UTC dates
         if (dt.endsWith("Z")) {
             return new Date(dt).toISOString();
         }
 
-        // convert local time to ISO string
+        // handle other dates with time
         if (dt.includes("T")) {
             const year = dt.substring(0, 4);
             const month = dt.substring(4, 6);
             const day = dt.substring(6, 8);
-            const hour = dt.substring(9, 11);
-            const min = dt.substring(11, 13);
+            const hour = dt.substring(9, 11) || "00";
+            const min = dt.substring(11, 13) || "00";
+            const sec = dt.substring(13, 15) || "00";
 
             return new Date(
-                `${year}-${month}-${day}T${hour}:${min}:00`
+                `${year}-${month}-${day}T${hour}:${min}:${sec}`
             ).toISOString();
         }
 
-        // date only
-        return new Date(
-            dt.substring(0, 4) + "-" +
-            dt.substring(4, 6) + "-" +
-            dt.substring(6, 8)
-        ).toISOString();
+        // handle dates
+        if (/^\d{8}$/.test(dt)) {
+            const year = dt.substring(0, 4);
+            const month = dt.substring(4, 6);
+            const day = dt.substring(6, 8);
+            return new Date(`${year}-${month}-${day}T00:00:00`).toISOString();
+        }
+
+        return null;
 
     } catch (err) {
         console.error("Time parse error:", dt, err);
         return null;
     }
 }
+
 
 
 //conver ics event to unified event object
