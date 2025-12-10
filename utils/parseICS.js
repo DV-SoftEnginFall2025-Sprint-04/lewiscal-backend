@@ -72,42 +72,42 @@ function parseICS(icsText) {
 
 //parser for various ICS time formats
 function parseICSTime(dt) {
-    if (!dt) return null;
+    try {
+        if (dt.includes("TZID=")) {
+            dt = dt.split(":")[1];
+        }
 
-    //see if native Date can parse it
-    if (!isNaN(Date.parse(dt))) {
-        return new Date(dt).toISOString();
+        // ends with z is utc
+        if (dt.endsWith("Z")) {
+            return new Date(dt).toISOString();
+        }
+
+        // convert local time to ISO string
+        if (dt.includes("T")) {
+            const year = dt.substring(0, 4);
+            const month = dt.substring(4, 6);
+            const day = dt.substring(6, 8);
+            const hour = dt.substring(9, 11);
+            const min = dt.substring(11, 13);
+
+            return new Date(
+                `${year}-${month}-${day}T${hour}:${min}:00`
+            ).toISOString();
+        }
+
+        // date only
+        return new Date(
+            dt.substring(0, 4) + "-" +
+            dt.substring(4, 6) + "-" +
+            dt.substring(6, 8)
+        ).toISOString();
+
+    } catch (err) {
+        console.error("Time parse error:", dt, err);
+        return null;
     }
-
-    //formatting yyyyMMddTHHmmssZ (UTC)
-    if (dt.includes("T") && dt.endsWith("Z")) {
-        const date = new Date(dt);
-        return isNaN(date.getTime()) ? null : date.toISOString();
-    }
-
-    //format yyyyMMddTHHmmss (local)
-    if (dt.includes("T")) {
-        const yyyy = dt.substring(0, 4);
-        const mm = dt.substring(4, 6);
-        const dd = dt.substring(6, 8);
-        const hh = dt.substring(9, 11);
-        const min = dt.substring(11, 13);
-        const date = new Date(`${yyyy}-${mm}-${dd}T${hh}:${min}:00`);
-        return isNaN(date.getTime()) ? null : date.toISOString();
-    }
-
-    // tmd formatting
-    if (dt.length === 8) {
-        const yyyy = dt.substring(0, 4);
-        const mm = dt.substring(4, 6);
-        const dd = dt.substring(6, 8);
-        const date = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
-        return isNaN(date.getTime()) ? null : date.toISOString();
-    }
-
-    console.warn("Unhandled time format:", dt);
-    return null;
 }
+
 
 //conver ics event to unified event object
 function convertToEventObject(raw) {
