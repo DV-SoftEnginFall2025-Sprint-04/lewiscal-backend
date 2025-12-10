@@ -1,17 +1,15 @@
-// updated to add error handling for bad urls, missing fields, bad fetches
-// and to merge in hardcoded scholarship events
-//return everything in the unified event object format
-//should be ready for pasting calendar link
-
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const fetch = require('node-fetch');
-const { parseICS, createEventObject } = require('../utils/parseICS');
 
+// node fetch v2 setup
+const fetch = require("node-fetch");
+globalThis.fetch = fetch;
+
+const { parseICS, createEventObject } = require('../utils/parseICS');
 const router = express.Router();
 
-//hardcoded celebration of scholarship events
+//scholarship events
 const scholarshipEvents = [
     createEventObject({
         id: "sch-001",
@@ -33,35 +31,45 @@ const scholarshipEvents = [
     })
 ];
 
-// refresh route
+// refresh
 router.get('/', async (req, res) => {
     try {
-        //local or user-provided URL
-        const calendarURL = req.query.url;  
-
+        const calendarURL = req.query.url;
         let icsContent = "";
 
-        //user-provided URL
+        // ics link provided
         if (calendarURL && calendarURL.startsWith("http")) {
             try {
-                const response = await fetch(calendarURL);
+                console.log("Fetching ICS from:", calendarURL);
+
+                const response = await fetch(calendarURL, {
+                    method: "GET",
+                    headers: {
+                        "User-Agent": "Mozilla/5.0",     
+                        "Accept": "text/calendar,*/*"    
+                    }
+                });
 
                 if (!response.ok) {
                     return res.status(400).json({
-                        error: "Invalid calendar link.",
-                        status: response.status
+                        error: "Failed to fetch the provided ICS URL.",
+                        status: response.status,
+                        statusText: response.statusText
                     });
                 }
 
                 icsContent = await response.text();
             } catch (err) {
+                console.error("ICS Fetch Error:", err);
+
                 return res.status(500).json({
                     error: "Unable to fetch calendar URL.",
                     details: err.message
                 });
             }
-        } 
-        //fallback to local calendar.ics file
+        }
+
+        //fallback to local file
         else {
             const calendarPath = path.join(__dirname, '..', 'calendar.ics');
 
@@ -72,16 +80,16 @@ router.get('/', async (req, res) => {
                 });
             }
 
-            icsContent = fs.readFileSync(calendarPath, 'utf-8');
+            icsContent = fs.readFileSync(calendarPath, "utf-8");
         }
 
-        // parse ICS content
+        // parce ic content
         const parsedEvents = parseICS(icsContent);
 
-        // marge scholarship events
+        // merge events
         const allEvents = [...parsedEvents, ...scholarshipEvents];
 
-        res.json({
+        return res.json({
             updated: true,
             totalEvents: allEvents.length,
             importedEvents: parsedEvents.length,
@@ -92,7 +100,7 @@ router.get('/', async (req, res) => {
     } catch (error) {
         console.error("Refresh Route Error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             error: "Unable to refresh calendar.",
             details: error.message
         });
